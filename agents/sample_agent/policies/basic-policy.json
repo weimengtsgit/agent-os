@@ -1,0 +1,26 @@
+{
+  "id": "basic-policy",
+  "name": "Basic Policy",
+  "version": "1.0.0",
+  "description": "Basic policy with rate limiting and cost controls",
+  "rules": [
+    {
+      "type": "rate_limit",
+      "config": {
+        "max_requests_per_minute": 10
+      }
+    },
+    {
+      "type": "cost_limit",
+      "config": {
+        "max_cost_per_run": 1.0
+      }
+    },
+    {
+      "type": "allowed_tools",
+      "config": {
+        "tools": ["echo-tool"]
+      }
+    }
+  ]
+}

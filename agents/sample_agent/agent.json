@@ -1,0 +1,14 @@
+{
+  "id": "sample-agent",
+  "name": "Sample Agent",
+  "version": "1.0.0",
+  "description": "A sample agent for testing the Agent OS platform",
+  "runtime": "agno",
+  "tools": ["echo-tool"],
+  "policies": ["basic-policy"],
+  "config": {
+    "model": "gpt-4",
+    "temperature": 0.7,
+    "max_tokens": 1000
+  }
+}
