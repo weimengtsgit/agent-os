@@ -1,0 +1,28 @@
+apiVersion: agent-os.dev/v1alpha1
+kind: Policy
+metadata:
+  name: allow-calculator-only
+  namespace: default
+  labels:
+    category: security
+    enforcement: hard
+spec:
+  description: "Policy that only allows calculator tool"
+
+  type: access-control
+  enforcement: hard
+
+  selector:
+    matchLabels:
+      runtime: agno
+
+  config:
+    accessControl:
+      allowedTools:
+        - "calculator"
+        - "echo"
+      deniedTools: []
+
+status:
+  phase: Active
+  lastValidated: null

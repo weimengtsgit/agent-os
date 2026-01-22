@@ -1,0 +1,49 @@
+apiVersion: agent-os.dev/v1alpha1
+kind: Tool
+metadata:
+  name: testcase-validator
+  version: 1.0.0
+  description: "Validates test cases against quality rules"
+  labels:
+    category: validation
+    type: rule-based
+  annotations:
+    author: Agent OS Team
+    created: "2026-01-22"
+  status:
+    phase: active
+    lastValidated: "2026-01-22T00:00:00Z"
+
+spec:
+  type: function
+  description: "Validates test cases for completeness, correctness, and quality"
+
+  parameters:
+    type: object
+    properties:
+      testCases:
+        type: array
+        description: "Test cases to validate"
+      rules:
+        type: array
+        description: "Validation rules to apply"
+        default: ["has_description", "has_steps", "has_expected_result"]
+    required:
+      - testCases
+
+  returns:
+    type: object
+    properties:
+      valid:
+        type: boolean
+        description: "Overall validation result"
+      validationResults:
+        type: array
+        description: "Detailed validation results per test case"
+      errors:
+        type: array
+        description: "List of validation errors"
+
+  config:
+    timeoutMs: 10000
+    retries: 1

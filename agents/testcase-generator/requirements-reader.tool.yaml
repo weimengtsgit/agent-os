@@ -1,0 +1,42 @@
+apiVersion: agent-os.dev/v1alpha1
+kind: Tool
+metadata:
+  name: requirements-reader
+  version: 1.0.0
+  description: "Reads and parses requirements documents (mock implementation)"
+  labels:
+    category: io
+    type: reader
+  annotations:
+    author: Agent OS Team
+    created: "2026-01-22"
+  status:
+    phase: active
+    lastValidated: "2026-01-22T00:00:00Z"
+
+spec:
+  type: function
+  description: "Reads requirements from a document and returns structured data"
+
+  parameters:
+    type: object
+    properties:
+      requirementsPath:
+        type: string
+        description: "Path to requirements document"
+    required:
+      - requirementsPath
+
+  returns:
+    type: object
+    properties:
+      requirements:
+        type: array
+        description: "List of parsed requirements"
+      metadata:
+        type: object
+        description: "Document metadata"
+
+  config:
+    timeoutMs: 5000
+    retries: 2

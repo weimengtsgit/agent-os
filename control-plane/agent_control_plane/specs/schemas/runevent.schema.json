@@ -1,0 +1,127 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agent-os.dev/schemas/v1alpha1/runevent.json",
+  "title": "RunEvent",
+  "description": "RunEvent specification - single source of truth for agent execution",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "enum": ["agent-os.dev/v1alpha1"],
+      "description": "API version of the RunEvent spec"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["RunEvent"],
+      "description": "Resource kind, must be 'RunEvent'"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["runId", "timestamp"],
+      "properties": {
+        "runId": {
+          "type": "string",
+          "pattern": "^run-[a-z0-9-]+$",
+          "description": "Unique run identifier"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Event timestamp (ISO 8601)"
+        },
+        "agentName": {
+          "type": "string",
+          "description": "Name of the agent that produced this event"
+        },
+        "agentVersion": {
+          "type": "string",
+          "description": "Version of the agent"
+        },
+        "sequenceNumber": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Sequence number within the run"
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["eventType"],
+      "properties": {
+        "eventType": {
+          "type": "string",
+          "enum": [
+            "run.start",
+            "run.end",
+            "agent.start",
+            "agent.end",
+            "tool.call",
+            "tool.result",
+            "llm.request",
+            "llm.response",
+            "error",
+            "policy.violation",
+            "custom"
+          ],
+          "description": "Type of the event"
+        },
+        "data": {
+          "type": "object",
+          "description": "Event-specific data payload"
+        },
+        "parentEventId": {
+          "type": "string",
+          "description": "Parent event ID for nested events"
+        },
+        "traceId": {
+          "type": "string",
+          "description": "Distributed trace ID"
+        },
+        "spanId": {
+          "type": "string",
+          "description": "Span ID within the trace"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information (for eventType=error)",
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code"
+            },
+            "message": {
+              "type": "string",
+              "description": "Error message"
+            },
+            "stackTrace": {
+              "type": "string",
+              "description": "Stack trace"
+            }
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "description": "Performance metrics",
+          "properties": {
+            "durationMs": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Duration in milliseconds"
+            },
+            "tokensUsed": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Tokens consumed"
+            },
+            "cost": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Cost in USD"
+            }
+          }
+        }
+      }
+    }
+  }
+}

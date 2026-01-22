@@ -1,0 +1,41 @@
+apiVersion: agent-os.dev/v1alpha1
+kind: Agent
+metadata:
+  name: sample-agent-with-policy
+  namespace: default
+  labels:
+    category: sample
+    runtime: agno
+    version: v1
+spec:
+  description: "Sample agent with policy enforcement (denies web-search)"
+
+  runtime:
+    type: agno
+    version: ">=0.1.0"
+
+  behavior:
+    systemPrompt: |
+      You are a helpful assistant that demonstrates Agent OS capabilities.
+      You can answer questions, perform tasks, and use tools effectively.
+      Always be clear, concise, and helpful in your responses.
+    temperature: 0.7
+    maxTokens: 2000
+    model: "gpt-4"
+
+  tools:
+    - name: calculator
+      type: reference
+      description: "Perform mathematical calculations"
+
+    - name: web-search
+      type: custom
+      description: "Search the web for information"
+
+  policies:
+    - name: deny-web-search
+      enabled: true
+
+status:
+  phase: Draft
+  lastValidated: null

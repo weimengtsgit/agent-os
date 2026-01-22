@@ -1,0 +1,509 @@
+## 1️⃣ 本轮产出摘要（B3）
+
+1. 给出 **Spec-first 目标架构**：平台契约（Specs）先行，Runtime（agno）通过 Adapter 接入
+2. 输出 **5 份平台级契约的 JSON Schema**：Agent / Tool / RunEvent / TraceSpan / Policy
+3. 明确 **平台最关键的 5 个契约接口点**：Spec Registry、Run/Event Stream、Tool Gateway、Trace Sink、Policy Decision
+4. 给出 **数据流（4 条）**：对话请求流、工作流运行流、工具调用流、审计观测流
+5. 给出 **部署拓扑建议**：数据面与控制面分离；MVP 可单体，演进可拆分
+6. 明确 **agno 绑定红线**：agno 只在 `agent-runtime-agno` 内出现，平台/业务只面向 schemas + PAL
+
+---
+
+## 2️⃣ 可执行 TODO 清单（P0/P1/P2，≥12）
+
+### P0（本周必须完成）
+
+1. 在仓库新增 `control-plane/specs/schemas/`，落地 5 个 JSON Schema 文件（见下文）
+2. 实现 `specs/validator.py`：用 JSON Schema 校验 Agent/Tool/Policy
+3. 实现 `registry` 的最小存储（本地文件/SQLite 任选）并支持 CRUD：AgentSpec/ToolSpec/PolicySpec
+4. 在 Runtime（agno Adapter）里强制：启动前必须通过 schema 校验
+5. 定义 RunEvent 的写入通道（stdout/文件/队列均可），保证事件序列完整
+6. 给 Tool Gateway 加上：超时、重试、权限检查（调用 PolicyEngine）
+
+### P1（MVP 期间尽快补齐）
+
+7. 实现 `RunEvent` 与 `TraceSpan` 的关联：traceId/spanId 在事件 payload 中可选携带
+8. Spec 中引入 `promptRef/modelRef` 的版本化规则（先字符串约定，后续资源服务化）
+9. Console 最小接口：列出 Agents/Tools/Runs，查看单次 Run 事件流
+10. 添加 Contract Tests：固定输入 → 事件序列 + 关键字段稳定
+11. 在 CI 中加入 schema lint + spec validation（对 agents/ 下所有 spec 文件）
+12. 实现 `PolicyDecision` 的审计事件：policy_allow/policy_deny（可作为 RunEvent 的一种 step）
+
+### P2（预留接口，后续演进）
+
+13. 引入多租户字段（tenantId）但先不启用（schema 先预留）
+14. OTLP 导出：TraceSink 支持 OpenTelemetry（后续）
+15. AgentSpec 支持 runtimeSelector（选择 agno/其它 runtime）
+16. Prompt 资产服务/配置中心化（promptRef 从文件迁移到服务）
+
+---
+
+## 3️⃣ 关键接口/契约草案（JSON Schema 输出）
+
+> 建议文件名（你可直接按此落盘）：
+> `agent.schema.json`、`tool.schema.json`、`run-event.schema.json`、`trace-span.schema.json`、`policy.schema.json`
+
+### 3.1 Agent Spec — `agent.schema.json`
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent.platform/schemas/agent.schema.json",
+  "title": "AgentSpec",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": { "type": "string", "const": "agent.platform/v1" },
+    "kind": { "type": "string", "const": "Agent" },
+    "metadata": {
+      "type": "object",
+      "required": ["name", "version", "owner"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]{2,62}$" },
+        "version": { "type": "string", "pattern": "^v?\\d+\\.\\d+\\.\\d+(-[a-z0-9.-]+)?$" },
+        "owner": { "type": "string", "minLength": 2 },
+        "labels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "default": {}
+        },
+        "description": { "type": "string", "default": "" }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["type", "modelRef", "promptRef", "tools"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["conversational", "workflow", "batch"] },
+        "runtime": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "selector": { "type": "string", "default": "agno" },
+            "params": { "type": "object", "additionalProperties": true, "default": {} }
+          },
+          "default": { "selector": "agno", "params": {} }
+        },
+        "modelRef": {
+          "type": "object",
+          "required": ["provider", "name"],
+          "additionalProperties": false,
+          "properties": {
+            "provider": { "type": "string", "minLength": 2 },
+            "name": { "type": "string", "minLength": 1 },
+            "params": { "type": "object", "additionalProperties": true, "default": {} }
+          }
+        },
+        "promptRef": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Versioned prompt reference, e.g. prompts/test_case_v1 or prompt://test-case/v1"
+        },
+        "tools": {
+          "type": "array",
+          "minItems": 0,
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{2,62}$" },
+          "default": []
+        },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "policiesRef": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxTokens": { "type": "integer", "minimum": 256, "default": 8000 },
+            "maxToolCalls": { "type": "integer", "minimum": 0, "default": 20 },
+            "timeoutMs": { "type": "integer", "minimum": 100, "default": 600000 }
+          },
+          "default": { "maxTokens": 8000, "maxToolCalls": 20, "timeoutMs": 600000 }
+        },
+        "observability": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "trace": { "type": "boolean", "default": true },
+            "costTracking": { "type": "boolean", "default": true },
+            "eventLevel": { "type": "string", "enum": ["minimal", "standard", "verbose"], "default": "standard" }
+          },
+          "default": { "trace": true, "costTracking": true, "eventLevel": "standard" }
+        }
+      }
+    }
+  }
+}
+```
+
+---
+
+### 3.2 Tool Spec — `tool.schema.json`
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent.platform/schemas/tool.schema.json",
+  "title": "ToolSpec",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": { "type": "string", "const": "agent.platform/v1" },
+    "kind": { "type": "string", "const": "Tool" },
+    "metadata": {
+      "type": "object",
+      "required": ["name", "owner", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]{2,62}$" },
+        "version": { "type": "string", "pattern": "^v?\\d+\\.\\d+\\.\\d+(-[a-z0-9.-]+)?$" },
+        "owner": { "type": "string", "minLength": 2 },
+        "description": { "type": "string", "default": "" },
+        "labels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "default": {}
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["inputsSchema", "outputsSchema"],
+      "additionalProperties": false,
+      "properties": {
+        "inputsSchema": { "type": "object", "additionalProperties": true },
+        "outputsSchema": { "type": "object", "additionalProperties": true },
+        "timeoutMs": { "type": "integer", "minimum": 1, "default": 3000 },
+        "retry": { "type": "integer", "minimum": 0, "maximum": 10, "default": 0 },
+        "idempotent": { "type": "boolean", "default": false },
+        "sideEffects": { "type": "boolean", "default": false },
+        "auth": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string", "enum": ["none", "apiKey", "oauth2", "serviceAccount"], "default": "none" },
+            "scopes": { "type": "array", "items": { "type": "string" }, "default": [] }
+          },
+          "default": { "type": "none", "scopes": [] }
+        },
+        "permissions": { "type": "array", "items": { "type": "string" }, "default": [] },
+        "rateLimit": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "rps": { "type": "number", "minimum": 0, "default": 0 },
+            "burst": { "type": "integer", "minimum": 0, "default": 0 }
+          },
+          "default": { "rps": 0, "burst": 0 }
+        },
+        "dataScope": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Optional data boundary hints, e.g. project, namespace, tenant"
+        }
+      }
+    }
+  }
+}
+```
+
+---
+
+### 3.3 Run Event — `run-event.schema.json`
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent.platform/schemas/run-event.schema.json",
+  "title": "RunEvent",
+  "type": "object",
+  "required": ["runId", "sessionId", "agent", "eventType", "timestamp", "payload"],
+  "additionalProperties": false,
+  "properties": {
+    "runId": { "type": "string", "minLength": 6 },
+    "sessionId": { "type": "string", "minLength": 6 },
+    "agent": { "type": "string", "minLength": 1 },
+    "eventType": {
+      "type": "string",
+      "enum": [
+        "run_start",
+        "run_step",
+        "tool_call",
+        "tool_result",
+        "human_review_request",
+        "human_review_result",
+        "policy_allow",
+        "policy_deny",
+        "run_end",
+        "run_error",
+        "run_cancel"
+      ]
+    },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "traceId": { "type": "string" },
+    "spanId": { "type": "string" },
+    "payload": { "type": "object", "additionalProperties": true }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "eventType": { "const": "tool_call" } }, "required": ["eventType"] },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "required": ["tool", "input"],
+            "additionalProperties": true,
+            "properties": {
+              "tool": { "type": "string" },
+              "input": { "type": "object", "additionalProperties": true },
+              "attempt": { "type": "integer", "minimum": 1, "default": 1 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "eventType": { "const": "tool_result" } }, "required": ["eventType"] },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "required": ["tool", "output", "status"],
+            "additionalProperties": true,
+            "properties": {
+              "tool": { "type": "string" },
+              "status": { "type": "string", "enum": ["ok", "error"] },
+              "output": { "type": "object", "additionalProperties": true },
+              "error": { "type": "object", "additionalProperties": true }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
+```
+
+---
+
+### 3.4 Trace Span — `trace-span.schema.json`
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent.platform/schemas/trace-span.schema.json",
+  "title": "TraceSpan",
+  "type": "object",
+  "required": ["traceId", "spanId", "name", "startTime", "endTime", "status"],
+  "additionalProperties": false,
+  "properties": {
+    "traceId": { "type": "string" },
+    "spanId": { "type": "string" },
+    "parentSpanId": { "type": "string" },
+    "name": { "type": "string", "minLength": 1 },
+    "kind": { "type": "string", "enum": ["agent", "llm", "tool", "system"], "default": "system" },
+    "startTime": { "type": "string", "format": "date-time" },
+    "endTime": { "type": "string", "format": "date-time" },
+    "status": { "type": "string", "enum": ["ok", "error", "canceled"] },
+    "attributes": { "type": "object", "additionalProperties": true, "default": {} },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "promptTokens": { "type": "integer", "minimum": 0 },
+        "completionTokens": { "type": "integer", "minimum": 0 },
+        "totalTokens": { "type": "integer", "minimum": 0 },
+        "cost": { "type": "number", "minimum": 0 }
+      },
+      "default": {}
+    }
+  }
+}
+```
+
+---
+
+### 3.5 Policy Spec — `policy.schema.json`
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent.platform/schemas/policy.schema.json",
+  "title": "PolicySpec",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": { "type": "string", "const": "agent.platform/v1" },
+    "kind": { "type": "string", "const": "Policy" },
+    "metadata": {
+      "type": "object",
+      "required": ["name", "version", "owner"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]{2,62}$" },
+        "version": { "type": "string", "pattern": "^v?\\d+\\.\\d+\\.\\d+(-[a-z0-9.-]+)?$" },
+        "owner": { "type": "string", "minLength": 2 },
+        "description": { "type": "string", "default": "" }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["rules"],
+      "additionalProperties": false,
+      "properties": {
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["effect", "action"],
+            "additionalProperties": false,
+            "properties": {
+              "effect": { "type": "string", "enum": ["allow", "deny"] },
+              "action": { "type": "string", "enum": ["tool.call", "model.use", "data.read", "data.write"] },
+              "selector": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "agent": { "type": "string", "default": "*" },
+                  "tool": { "type": "string", "default": "*" },
+                  "modelProvider": { "type": "string", "default": "*" }
+                },
+                "default": { "agent": "*", "tool": "*", "modelProvider": "*" }
+              },
+              "conditions": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "e.g. actor.role in [admin], tenant == X, time window, etc."
+              }
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxTokens": { "type": "integer", "minimum": 256 },
+            "maxToolCalls": { "type": "integer", "minimum": 0 },
+            "timeoutMs": { "type": "integer", "minimum": 100 }
+          },
+          "default": {}
+        },
+        "redaction": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "patterns": { "type": "array", "items": { "type": "string" }, "default": [] }
+          },
+          "default": { "enabled": false, "patterns": [] }
+        }
+      }
+    }
+  }
+}
+```
+
+---
+
+## 4️⃣ 目录结构/模块划分建议（Spec-first 落盘版）
+
+```text
+agent-platform/
+├── control-plane/
+│   ├── specs/
+│   │   ├── schemas/
+│   │   │   ├── agent.schema.json
+│   │   │   ├── tool.schema.json
+│   │   │   ├── run-event.schema.json
+│   │   │   ├── trace-span.schema.json
+│   │   │   └── policy.schema.json
+│   │   ├── validator.py
+│   │   └── README.md
+│   ├── registry/
+│   │   ├── store_sqlite.py
+│   │   ├── store_file.py
+│   │   └── service.py
+│   ├── pal/
+│   │   ├── types.py
+│   │   ├── runtime.py
+│   │   ├── tools.py
+│   │   ├── llm.py
+│   │   ├── memory.py
+│   │   ├── observability.py
+│   │   └── policy.py
+│   └── sdk/
+│       ├── cli.py            # validate, register, run-local
+│       └── loader.py         # load yaml/json spec -> dataclass
+│
+├── agent-runtime-agno/
+│   ├── adapters/
+│   │   ├── agno_runtime.py
+│   │   ├── agno_event_bridge.py
+│   │   └── agno_tool_bridge.py
+│   └── tests/
+│       ├── contract/
+│       └── fixtures/
+│
+├── agents/
+│   └── sample-agent/
+│       ├── agent.yaml
+│       ├── tools/
+│       │   └── jira_reader.tool.yaml
+│       └── prompts/
+│           └── prompt.txt
+└── console/
+    └── minimal/              # MVP: runs list + event viewer
+```
+
+---
+
+## 5️⃣ 里程碑与验收标准（量化）
+
+### M0：Schemas 落盘 + 校验（2–3 天）
+
+* [ ] 5 个 schema 文件在仓库
+* [ ] `validator.py` 支持校验：Agent/Tool/Policy
+* [ ] agents/ 下所有 spec 文件 CI 校验通过
+
+### M1：Spec 驱动启动 + 事件流（1–2 周）
+
+* [ ] AgentSpec → Runtime 启动（agno adapter）
+* [ ] run_start / tool_call / tool_result / run_end 至少齐全
+* [ ] 任意 tool_call 必须先 policy_check（allow/deny 事件）
+
+### M2：Console 最小可视化（1 周）
+
+* [ ] Runs 列表 + 事件流查看
+* [ ] 能按 runId 查询完整事件序列
+* [ ] traceId 可定位到 span（哪怕是 JSON 文件）
+
+---
+
+## 6️⃣ 风险与回滚方案（≥3）
+
+1. **Schema 过严导致迭代慢**
+
+   * 回滚：允许 `spec.*.params`/`additionalProperties:true` 的“扩展口”，但只在 spec 的 params 字段里开放
+
+2. **RunEvent payload 乱长乱散**
+
+   * 回滚：规定 eventType 的 payload 最小必填（已在 schema 用 if/then 约束 tool_*），其余放 `payload.extra`
+
+3. **Policy 过复杂拖慢 MVP**
+
+   * 回滚：MVP 只实现 allowTools / maxTokens / timeoutMs；RBAC/租户后置
+
+4. **agno 中间过程不可稳定映射为 run_step**
+
+   * 回滚：step 事件降级为 “log step”，不强求结构化；关键是 tool_* 与 end/error/cancel

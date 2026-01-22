@@ -1,0 +1,61 @@
+apiVersion: agent-os.dev/v1alpha1
+kind: Agent
+metadata:
+  name: testcase-generator
+  version: 1.0.0
+  description: "Generates test cases from requirements with human review workflow"
+  labels:
+    category: testing
+    workflow: human-in-loop
+  annotations:
+    author: Agent OS Team
+    created: "2026-01-22"
+  status:
+    phase: active
+    lastValidated: "2026-01-22T00:00:00Z"
+
+spec:
+  description: "Test case generator agent with human-in-the-loop workflow"
+
+  runtime:
+    type: agno
+    version: ">=0.1.0"
+    config:
+      timeout: 300
+      retries: 2
+
+  behavior:
+    model: gpt-4
+    temperature: 0.7
+    systemPrompt: |
+      You are a test case generation assistant.
+      Your task is to:
+      1. Read requirements from the provided document
+      2. Generate comprehensive test cases in JSON format
+      3. Validate the generated test cases
+      4. Write them to the artifacts directory
+
+      Always be thorough and ensure test cases cover edge cases.
+
+  tools:
+    - name: requirements-reader
+      type: reference
+      version: 1.0.0
+    - name: testcase-generator
+      type: reference
+      version: 1.0.0
+    - name: testcase-validator
+      type: reference
+      version: 1.0.0
+    - name: testcase-writer
+      type: reference
+      version: 1.0.0
+
+  policies: []
+
+  config:
+    maxIterations: 10
+    timeoutMs: 300000
+    humanReview:
+      enabled: true
+      stage: after-generation

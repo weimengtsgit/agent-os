@@ -1,0 +1,53 @@
+apiVersion: agent-os.dev/v1alpha1
+kind: Tool
+metadata:
+  name: testcase-writer
+  version: 1.0.0
+  description: "Writes test cases to artifacts directory"
+  labels:
+    category: io
+    type: writer
+  annotations:
+    author: Agent OS Team
+    created: "2026-01-22"
+  status:
+    phase: active
+    lastValidated: "2026-01-22T00:00:00Z"
+
+spec:
+  type: function
+  description: "Writes validated test cases to runs/<runId>/artifacts/ directory"
+
+  parameters:
+    type: object
+    properties:
+      testCases:
+        type: array
+        description: "Test cases to write"
+      runId:
+        type: string
+        description: "Run ID for artifact path"
+      filename:
+        type: string
+        description: "Output filename"
+        default: "testcases.json"
+    required:
+      - testCases
+      - runId
+
+  returns:
+    type: object
+    properties:
+      success:
+        type: boolean
+        description: "Write operation success"
+      artifactPath:
+        type: string
+        description: "Path to written artifact"
+      testCaseCount:
+        type: integer
+        description: "Number of test cases written"
+
+  config:
+    timeoutMs: 5000
+    retries: 2

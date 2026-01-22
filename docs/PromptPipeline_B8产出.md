@@ -1,0 +1,228 @@
+## 1️⃣ 本轮产出摘要（B8）
+
+1. 明确 **“永不变化层”**：平台契约（Spec / Event / Trace / Policy）是唯一长期稳定资产
+2. 给出 **PAL（Platform Abstraction Layer）解耦原则**：接口先行、Adapter 可替换、Contract Tests 护航
+3. 设计 **多 Runtime 并存架构**：Runtime Router + 能力声明，避免一次性迁移
+4. 提供 **迁移三板斧**：双跑（Shadow）→ 对比 → 切流
+5. 给出 **GameDay 演练方案**：在不影响生产的前提下验证“可切换性”
+6. 明确 **红线与触发条件**：何时必须解耦/迁移、何时可以继续绑定
+7. 输出 **数据迁移与回放策略**：不中断生产、不丢审计
+
+---
+
+## 2️⃣ 可执行 TODO 清单（P0 / P1 / P2，≥12）
+
+### P0（立刻要做，决定能不能解耦）
+
+1. 固化 **5 大稳定契约**：AgentSpec / ToolSpec / RunEvent / TraceSpan / PolicySpec（只允许向后兼容）
+2. 在 PAL 中定义 **最小运行时能力接口**（run/cancel/emit events）并禁止平台/业务直接调用 Runtime
+3. 实现 **Runtime Capability Declaration**（每个 Runtime 声明支持哪些能力）
+4. 实现 **Runtime Router**：按 AgentSpec.runtime.selector 路由
+5. 建立 **Contract Tests**：固定输入 → 事件序列 + 关键字段断言
+6. 强制 **事件优先**：所有 Runtime 必须产出标准 RunEvent（不允许“只日志不事件”）
+
+### P1（迁移准备）
+
+7. 实现 **Shadow Run**（双跑）：同一输入同时跑两个 Runtime
+8. 建立 **结果对比器**（Artifact Diff / 事件 Diff / 成本 Diff）
+9. 在 Registry 中支持 **Runtime 级灰度**（Agent 维度）
+10. 抽象 **LLMProvider**（Runtime 不能直连模型 SDK）
+11. 抽象 **ToolExecutor**（Runtime 不能直调业务工具）
+12. 事件与 Trace 的 **长期存储**（用于回放与回归）
+
+### P2（规模化）
+
+13. 自动 Runtime 选择（按成本/稳定性）
+14. 多 Runtime 的 SLO 对比面板
+15. Runtime 插件化发布
+16. Runtime 级配额与隔离
+
+---
+
+## 3️⃣ 稳定不变的“平台契约层”（红线）
+
+> **只要这些不变，Runtime 可随意换。**
+
+### 3.1 必须长期稳定的契约
+
+* **AgentSpec**：描述“要做什么”，不描述“怎么做”
+* **ToolSpec**：输入/输出/权限/超时，独立于 Runtime
+* **RunEvent**：运行事实的唯一真相（事实流）
+* **TraceSpan**：性能与成本事实
+* **PolicySpec**：允许/拒绝/限额的规则
+
+**规则**
+
+* 只能 **向后兼容**（新增字段允许，删除/重命名禁止）
+* 任何 Runtime 内部概念 **不得泄漏到契约**
+
+---
+
+## 4️⃣ PAL 解耦设计（Adapter + Contract Tests）
+
+### 4.1 PAL 分层原则
+
+* **Platform / Business 只依赖 PAL 接口**
+* **Runtime 只通过 Adapter 实现 PAL**
+* **Adapter 是唯一允许 import runtime SDK 的地方**
+
+```
+Business Agents
+      |
+   Platform SDK
+      |
+   PAL Interfaces  <——— Contract Tests
+      |
+   Runtime Adapter (agno / future)
+      |
+   Runtime SDK
+```
+
+### 4.2 Runtime Capability Declaration（示例）
+
+```json
+{
+  "runtime": "agno",
+  "version": ">=0.7",
+  "capabilities": {
+    "modes": ["conversational", "workflow"],
+    "toolCalling": true,
+    "humanInLoop": true,
+    "multimodal": false,
+    "streaming": true,
+    "maxContextTokens": 128000
+  },
+  "limits": {
+    "concurrentRuns": 50
+  }
+}
+```
+
+> Runtime Router 可据此拒绝不匹配的 AgentSpec。
+
+---
+
+## 5️⃣ 多 Runtime 并存架构（不中断生产）
+
+### 5.1 Runtime Router（核心）
+
+```python
+class RuntimeRouter:
+    def select(self, agent_spec: AgentSpec) -> AgentRuntime:
+        selector = agent_spec.spec.runtime.selector
+        return self._runtimes[selector]
+```
+
+### 5.2 并存策略
+
+* **单 Agent 多 Runtime**：同一 Agent 不同 version 绑定不同 Runtime
+* **平台同时支持 N 个 Runtime**：agno / future-runtime
+* **默认 Runtime**：通过 registry 配置
+
+---
+
+## 6️⃣ 迁移三板斧（强烈推荐）
+
+### 6.1 双跑（Shadow Run）
+
+* 同一输入
+* Runtime A（当前生产）
+* Runtime B（候选）
+* **不返回 B 的结果给用户**
+
+### 6.2 对比（Diff）
+
+* **Artifact Diff**：输出结构/字段差异
+* **Event Diff**：事件序列/时序
+* **Cost Diff**：token/cost
+* **SLO Diff**：成功率/耗时
+
+### 6.3 切流（Switch）
+
+* 先切 **canary Agent**
+* 再切 **prod Agent**
+* 随时可回滚（Router 指回）
+
+---
+
+## 7️⃣ GameDay 演练方案（必须做）
+
+### 7.1 演练目标
+
+* 验证：**Runtime 真能被替换，而不是 PPT 解耦**
+
+### 7.2 GameDay 场景
+
+1. agno Adapter 升级小版本
+2. agno Runtime 出现异常（模拟 tool_call 失败）
+3. 切换到备用 Runtime
+4. 验证：
+
+   * 新 Run 成功
+   * 事件完整
+   * 审计不丢失
+
+### 7.3 成功标准
+
+* 无需修改 AgentSpec / ToolSpec
+* 无需重启平台
+* 回滚 ≤ 5 分钟
+
+---
+
+## 8️⃣ 数据迁移与不中断策略
+
+### 8.1 必须可迁移的数据
+
+* AgentSpec / ToolSpec / PolicySpec
+* RunEvent / TraceSpan（事实流）
+* Artifacts（testcases.json 等）
+
+### 8.2 不要求迁移的数据
+
+* Runtime 内部中间态
+* 私有缓存
+
+### 8.3 回放能力
+
+* 任意历史 Run
+* 在新 Runtime 上 replay
+* 用于回归与验证
+
+---
+
+## 9️⃣ 何时“必须”解耦/迁移（触发条件）
+
+**立刻考虑迁移**
+
+* Runtime 升级频繁破坏行为
+* 成本/性能无法控制
+* 安全/合规能力缺失
+* 社区/维护风险显著
+
+**可以继续绑定**
+
+* Contract Tests 全绿
+* SLO 稳定
+* 成本可控
+* 平台能力 > Runtime 特性
+
+---
+
+## 🔟 风险与回滚方案（≥3）
+
+1. **风险：过早支持多 Runtime 增加复杂度**
+
+   * 回滚：MVP 只启用一个 Runtime，但 Router/Adapter 必须存在
+
+2. **风险：不同 Runtime 行为差异大**
+
+   * 回滚：以 Event/Artifact 为唯一比较对象，容忍内部过程差异
+
+3. **风险：双跑成本过高**
+
+   * 回滚：只对 canary / 样板 Agent 开 Shadow Run
+
+4. **风险：团队绕过 PAL 直接用 Runtime 特性**
+
+   * 回滚：CI 依赖扫描 + 代码评审红线

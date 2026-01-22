@@ -1,0 +1,46 @@
+apiVersion: agent-os.dev/v1alpha1
+kind: Tool
+metadata:
+  name: testcase-generator
+  version: 1.0.0
+  description: "Generates test cases from requirements using LLM"
+  labels:
+    category: generation
+    type: llm
+  annotations:
+    author: Agent OS Team
+    created: "2026-01-22"
+  status:
+    phase: active
+    lastValidated: "2026-01-22T00:00:00Z"
+
+spec:
+  type: function
+  description: "Generates comprehensive test cases in JSON format from requirements"
+
+  parameters:
+    type: object
+    properties:
+      requirements:
+        type: array
+        description: "List of requirements to generate test cases for"
+      format:
+        type: string
+        description: "Output format (json, yaml)"
+        default: json
+    required:
+      - requirements
+
+  returns:
+    type: object
+    properties:
+      testCases:
+        type: array
+        description: "Generated test cases"
+      summary:
+        type: object
+        description: "Generation summary with counts"
+
+  config:
+    timeoutMs: 30000
+    retries: 1

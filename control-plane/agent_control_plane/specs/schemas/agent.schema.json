@@ -1,0 +1,196 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agent-os.dev/schemas/v1alpha1/agent.json",
+  "title": "Agent",
+  "description": "Agent specification following Kubernetes CRD conventions",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "enum": ["agent-os.dev/v1alpha1"],
+      "description": "API version of the Agent spec"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["Agent"],
+      "description": "Resource kind, must be 'Agent'"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "maxLength": 63,
+          "description": "Agent name (DNS-1123 subdomain)"
+        },
+        "namespace": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "default": "default",
+          "description": "Namespace for the agent"
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Labels for categorization and selection"
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Annotations for metadata"
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["description", "runtime", "behavior"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable description of the agent"
+        },
+        "runtime": {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["agno", "langchain", "custom"],
+              "description": "Runtime type"
+            },
+            "version": {
+              "type": "string",
+              "description": "Runtime version constraint (e.g., '>=0.1.0')"
+            },
+            "config": {
+              "type": "object",
+              "description": "Runtime-specific configuration"
+            }
+          }
+        },
+        "behavior": {
+          "type": "object",
+          "required": ["systemPrompt"],
+          "properties": {
+            "systemPrompt": {
+              "type": "string",
+              "minLength": 1,
+              "description": "System prompt for the agent"
+            },
+            "temperature": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2,
+              "default": 0.7,
+              "description": "Sampling temperature"
+            },
+            "maxTokens": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 2000,
+              "description": "Maximum tokens to generate"
+            },
+            "model": {
+              "type": "string",
+              "description": "LLM model identifier"
+            }
+          }
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "type"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Tool name"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["builtin", "custom", "reference"],
+                "description": "Tool type"
+              },
+              "description": {
+                "type": "string",
+                "description": "Tool description"
+              },
+              "reference": {
+                "type": "string",
+                "description": "Reference to external tool spec (for type=reference)"
+              }
+            }
+          },
+          "description": "Tools available to the agent"
+        },
+        "policies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Policy name"
+              },
+              "enabled": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether the policy is enabled"
+              },
+              "config": {
+                "type": "object",
+                "description": "Policy-specific configuration"
+              }
+            }
+          },
+          "description": "Policies applied to the agent"
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": ["Draft", "Validated", "Registered", "Active", "Deprecated"],
+          "description": "Current phase of the agent"
+        },
+        "lastValidated": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Last validation timestamp"
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["True", "False", "Unknown"]
+              },
+              "reason": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

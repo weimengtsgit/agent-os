@@ -1,0 +1,37 @@
+apiVersion: agent-os.dev/v1alpha1
+kind: Tool
+metadata:
+  name: calculator
+  namespace: default
+  labels:
+    category: math
+    type: function
+  annotations:
+    version: "1.0.0"
+    author: "Agent OS Team"
+spec:
+  description: "A calculator tool that performs basic mathematical operations"
+
+  type: function
+
+  function:
+    name: calculate
+    description: "Evaluate a mathematical expression and return the result"
+    parameters:
+      type: object
+      properties:
+        expression:
+          type: string
+          description: "Mathematical expression to evaluate (e.g., '2 + 2', '10 * 5')"
+        precision:
+          type: integer
+          description: "Number of decimal places for the result"
+          default: 2
+          minimum: 0
+          maximum: 10
+      required:
+        - expression
+
+status:
+  phase: Draft
+  lastValidated: null

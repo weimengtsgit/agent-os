@@ -1,0 +1,85 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ summary.run_id }} - Agent OS Console{% endblock %}
+
+{% block content %}
+<div class="run-header">
+    <h2>Run Details</h2>
+    <a href="{{ url_for('runs') }}" class="btn">← Back to Runs</a>
+</div>
+
+<div class="run-summary">
+    <h3>Summary</h3>
+    <dl>
+        <dt>Run ID:</dt>
+        <dd><code>{{ summary.run_id }}</code></dd>
+
+        <dt>Agent:</dt>
+        <dd>{{ summary.agent_name }}</dd>
+
+        <dt>Status:</dt>
+        <dd><span class="status status-{{ summary.status }}">{{ summary.status }}</span></dd>
+
+        <dt>Start Time:</dt>
+        <dd>{{ summary.start_time | format_timestamp }}</dd>
+
+        {% if summary.end_time %}
+        <dt>End Time:</dt>
+        <dd>{{ summary.end_time | format_timestamp }}</dd>
+        {% endif %}
+
+        <dt>Events:</dt>
+        <dd>{{ summary.event_count }}</dd>
+
+        <dt>Artifacts:</dt>
+        <dd>{{ summary.artifacts | length }}</dd>
+    </dl>
+</div>
+
+{% if summary.review_pending %}
+<div class="review-section">
+    <h3>⚠️ Human Review Required</h3>
+    <p>This run is waiting for human review. Please review the generated artifacts and approve or reject.</p>
+
+    <form method="POST" action="{{ url_for('review_run', run_id=summary.run_id) }}" style="display: inline;">
+        <input type="hidden" name="decision" value="approve">
+        <button type="submit" class="btn btn-success">✓ Approve</button>
+    </form>
+
+    <form method="POST" action="{{ url_for('review_run', run_id=summary.run_id) }}" style="display: inline;">
+        <input type="hidden" name="decision" value="reject">
+        <button type="submit" class="btn btn-danger">✗ Reject</button>
+    </form>
+</div>
+{% endif %}
+
+{% if artifacts %}
+<div class="artifacts-section">
+    <h3>Artifacts</h3>
+    {% for filename, content in artifacts.items() %}
+    <div class="artifact">
+        <h4>{{ filename }}</h4>
+        <pre><code>{{ content | format_json if content is mapping else content }}</code></pre>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="events-section">
+    <h3>Events ({{ events | length }})</h3>
+    <div class="events-list">
+        {% for event in events %}
+        <div class="event event-{{ event.spec.eventType.replace('.', '-') }}">
+            <div class="event-header">
+                <span class="event-type">{{ event.spec.eventType }}</span>
+                <span class="event-seq">seq: {{ event.metadata.sequenceNumber }}</span>
+                <span class="event-time">{{ event.metadata.timestamp | format_timestamp }}</span>
+            </div>
+            <div class="event-body">
+                <pre><code>{{ event.spec.data | format_json }}</code></pre>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

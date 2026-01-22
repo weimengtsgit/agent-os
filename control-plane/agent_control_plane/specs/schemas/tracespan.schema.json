@@ -1,0 +1,159 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agent-os.dev/schemas/v1alpha1/tracespan.json",
+  "title": "TraceSpan",
+  "description": "TraceSpan specification following OpenTelemetry conventions",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "enum": ["agent-os.dev/v1alpha1"],
+      "description": "API version of the TraceSpan spec"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["TraceSpan"],
+      "description": "Resource kind, must be 'TraceSpan'"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["traceId", "spanId"],
+      "properties": {
+        "traceId": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$",
+          "description": "Trace ID (128-bit hex)"
+        },
+        "spanId": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{16}$",
+          "description": "Span ID (64-bit hex)"
+        },
+        "parentSpanId": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{16}$",
+          "description": "Parent span ID"
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["name", "startTime", "endTime"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Span name (e.g., 'agent.run', 'tool.call')"
+        },
+        "startTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Span start time (ISO 8601)"
+        },
+        "endTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Span end time (ISO 8601)"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["INTERNAL", "SERVER", "CLIENT", "PRODUCER", "CONSUMER"],
+          "default": "INTERNAL",
+          "description": "Span kind (OpenTelemetry)"
+        },
+        "status": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "enum": ["UNSET", "OK", "ERROR"],
+              "default": "UNSET",
+              "description": "Status code"
+            },
+            "message": {
+              "type": "string",
+              "description": "Status message"
+            }
+          }
+        },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Span attributes (key-value pairs)",
+          "properties": {
+            "agent.name": {
+              "type": "string",
+              "description": "Agent name"
+            },
+            "agent.version": {
+              "type": "string",
+              "description": "Agent version"
+            },
+            "tool.name": {
+              "type": "string",
+              "description": "Tool name (for tool spans)"
+            },
+            "llm.model": {
+              "type": "string",
+              "description": "LLM model used"
+            },
+            "llm.tokens.prompt": {
+              "type": "integer",
+              "description": "Prompt tokens"
+            },
+            "llm.tokens.completion": {
+              "type": "integer",
+              "description": "Completion tokens"
+            }
+          }
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "timestamp"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Event name"
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Event timestamp"
+              },
+              "attributes": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Event attributes"
+              }
+            }
+          },
+          "description": "Span events (logs)"
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["traceId", "spanId"],
+            "properties": {
+              "traceId": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{32}$"
+              },
+              "spanId": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{16}$"
+              },
+              "attributes": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          },
+          "description": "Links to other spans"
+        }
+      }
+    }
+  }
+}

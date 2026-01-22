@@ -1,0 +1,200 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agent-os.dev/schemas/v1alpha1/policy.json",
+  "title": "Policy",
+  "description": "Policy specification following Kubernetes CRD conventions",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "enum": ["agent-os.dev/v1alpha1"],
+      "description": "API version of the Policy spec"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["Policy"],
+      "description": "Resource kind, must be 'Policy'"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "maxLength": 63,
+          "description": "Policy name (DNS-1123 subdomain)"
+        },
+        "namespace": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "default": "default",
+          "description": "Namespace for the policy"
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Labels for categorization"
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Annotations for metadata"
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["type", "enforcement"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the policy"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["rate-limit", "content-filter", "cost-control", "access-control", "custom"],
+          "description": "Policy type"
+        },
+        "enforcement": {
+          "type": "string",
+          "enum": ["hard", "soft", "audit"],
+          "description": "Enforcement mode: hard (block), soft (warn), audit (log only)"
+        },
+        "selector": {
+          "type": "object",
+          "description": "Selector for which agents/tools this policy applies to",
+          "properties": {
+            "matchLabels": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Label selector"
+            },
+            "matchExpressions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["key", "operator"],
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "operator": {
+                    "type": "string",
+                    "enum": ["In", "NotIn", "Exists", "DoesNotExist"]
+                  },
+                  "values": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "config": {
+          "type": "object",
+          "description": "Policy-specific configuration",
+          "properties": {
+            "rateLimit": {
+              "type": "object",
+              "description": "Rate limit configuration (for type=rate-limit)",
+              "properties": {
+                "requestsPerMinute": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "requestsPerHour": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "requestsPerDay": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "contentFilter": {
+              "type": "object",
+              "description": "Content filter configuration (for type=content-filter)",
+              "properties": {
+                "blockedPatterns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Regex patterns to block"
+                },
+                "allowedDomains": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Allowed domains for external calls"
+                }
+              }
+            },
+            "costControl": {
+              "type": "object",
+              "description": "Cost control configuration (for type=cost-control)",
+              "properties": {
+                "maxCostPerRun": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Maximum cost per run (in USD)"
+                },
+                "maxCostPerDay": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Maximum cost per day (in USD)"
+                }
+              }
+            },
+            "accessControl": {
+              "type": "object",
+              "description": "Access control configuration (for type=access-control)",
+              "properties": {
+                "allowedUsers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "allowedGroups": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": ["Draft", "Validated", "Active", "Deprecated"],
+          "description": "Current phase of the policy"
+        },
+        "lastValidated": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Last validation timestamp"
+        }
+      }
+    }
+  }
+}

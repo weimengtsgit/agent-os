@@ -1,0 +1,25 @@
+apiVersion: agent-os.dev/v1alpha1
+kind: Tool
+metadata:
+  name: web-search
+  namespace: default
+  labels:
+    category: search
+    type: api
+spec:
+  description: "Search the web using an external API"
+
+  type: api
+
+  api:
+    endpoint: "https://api.example.com/search"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+      Accept: "application/json"
+    authentication:
+      type: bearer
+      secretRef: "web-search-api-key"
+
+status:
+  phase: Draft

@@ -1,0 +1,33 @@
+apiVersion: agent-os.dev/v1alpha1
+kind: Tool
+metadata:
+  name: calculator
+  namespace: default
+  labels:
+    category: math
+    type: function
+spec:
+  description: "A calculator tool that performs basic mathematical operations"
+
+  type: function
+
+  # Tool configuration (timeout and retry)
+  config:
+    timeoutMs: 5000
+    retries: 2
+
+  function:
+    name: calculate
+    description: "Evaluate a mathematical expression and return the result"
+    parameters:
+      type: object
+      properties:
+        expression:
+          type: string
+          description: "Mathematical expression to evaluate (e.g., '2 + 2', '10 * 5')"
+      required:
+        - expression
+
+status:
+  phase: Active
+  lastValidated: null

@@ -1,0 +1,26 @@
+apiVersion: agent-os.dev/v1alpha1
+kind: Policy
+metadata:
+  name: rate-limit
+  namespace: default
+  labels:
+    category: governance
+    enforcement: hard
+spec:
+  description: "Rate limiting policy to prevent excessive API usage"
+
+  type: rate-limit
+  enforcement: hard
+
+  selector:
+    matchLabels:
+      runtime: agno
+
+  config:
+    rateLimit:
+      requestsPerMinute: 60
+      requestsPerHour: 1000
+      requestsPerDay: 10000
+
+status:
+  phase: Draft

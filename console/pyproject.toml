@@ -1,0 +1,22 @@
+[project]
+name = "agent-os-console"
+version = "0.1.0"
+description = "Agent OS Console - Web UI for monitoring and managing agent runs"
+requires-python = ">=3.10"
+dependencies = [
+    "flask>=3.0.0",
+    "agent-control-plane",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["console*"]

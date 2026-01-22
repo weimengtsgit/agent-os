@@ -1,0 +1,190 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agent-os.dev/schemas/v1alpha1/tool.json",
+  "title": "Tool",
+  "description": "Tool specification following Kubernetes CRD conventions",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "enum": ["agent-os.dev/v1alpha1"],
+      "description": "API version of the Tool spec"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["Tool"],
+      "description": "Resource kind, must be 'Tool'"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "maxLength": 63,
+          "description": "Tool name (DNS-1123 subdomain)"
+        },
+        "namespace": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "default": "default",
+          "description": "Namespace for the tool"
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Labels for categorization"
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Annotations for metadata"
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "required": ["description", "type"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable description of the tool"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["function", "api", "mcp", "custom"],
+          "description": "Tool type"
+        },
+        "function": {
+          "type": "object",
+          "description": "Function tool specification (for type=function)",
+          "required": ["name", "parameters"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]+$",
+              "description": "Function name"
+            },
+            "description": {
+              "type": "string",
+              "description": "Function description"
+            },
+            "parameters": {
+              "type": "object",
+              "description": "JSON Schema for function parameters",
+              "required": ["type", "properties"],
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["object"]
+                },
+                "properties": {
+                  "type": "object"
+                },
+                "required": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "api": {
+          "type": "object",
+          "description": "API tool specification (for type=api)",
+          "required": ["endpoint", "method"],
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "format": "uri",
+              "description": "API endpoint URL"
+            },
+            "method": {
+              "type": "string",
+              "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"],
+              "description": "HTTP method"
+            },
+            "headers": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "HTTP headers"
+            },
+            "authentication": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["none", "bearer", "apikey", "basic"]
+                },
+                "secretRef": {
+                  "type": "string",
+                  "description": "Reference to secret containing credentials"
+                }
+              }
+            }
+          }
+        },
+        "mcp": {
+          "type": "object",
+          "description": "MCP tool specification (for type=mcp)",
+          "required": ["server", "toolName"],
+          "properties": {
+            "server": {
+              "type": "string",
+              "description": "MCP server identifier"
+            },
+            "toolName": {
+              "type": "string",
+              "description": "Tool name on MCP server"
+            }
+          }
+        },
+        "implementation": {
+          "type": "object",
+          "description": "Custom implementation details",
+          "properties": {
+            "language": {
+              "type": "string",
+              "enum": ["python", "javascript", "go", "rust"],
+              "description": "Implementation language"
+            },
+            "entrypoint": {
+              "type": "string",
+              "description": "Entrypoint for the tool"
+            },
+            "runtime": {
+              "type": "object",
+              "description": "Runtime requirements"
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": ["Draft", "Validated", "Registered", "Active", "Deprecated"],
+          "description": "Current phase of the tool"
+        },
+        "lastValidated": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Last validation timestamp"
+        }
+      }
+    }
+  }
+}

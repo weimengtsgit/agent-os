@@ -1,0 +1,31 @@
+apiVersion: agent-os.dev/v1alpha1
+kind: Policy
+metadata:
+  name: deny-web-search
+  namespace: default
+  labels:
+    category: security
+    enforcement: hard
+  annotations:
+    description: "Deny web search tool for security reasons"
+spec:
+  description: "Policy that denies access to web search tools"
+
+  type: access-control
+  enforcement: hard
+
+  selector:
+    matchLabels:
+      runtime: agno
+
+  config:
+    accessControl:
+      deniedTools:
+        - "web-search"
+        - "web-scraper"
+      allowedUsers: []
+      allowedGroups: []
+
+status:
+  phase: Active
+  lastValidated: null
